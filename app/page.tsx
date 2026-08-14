@@ -157,7 +157,7 @@ export default function Home() {
     <main>
       <div className="header-row">
         <div>
-          <h1>site-monitor</h1>
+          <h1>gloomymonitor</h1>
           <p className="sub" style={{ marginBottom: 0 }}>
             등록한 프로그램의 URL을 주기적으로 확인하고, 200이 아닌 상태가 나타나면 메일로 알려줍니다.
           </p>

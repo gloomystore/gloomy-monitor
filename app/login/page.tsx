@@ -35,7 +35,7 @@ export default function LoginPage() {
   return (
     <main className="login-main">
       <section className="login-box">
-        <h1>site-monitor</h1>
+        <h1>gloomymonitor</h1>
         <p className="sub">로그인이 필요합니다.</p>
         <form onSubmit={handleSubmit}>
           <div className="field">

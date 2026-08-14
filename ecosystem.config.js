@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'site-monitor',
+      name: 'gloomymonitor',
       cwd: __dirname,
       script: 'node_modules/next/dist/bin/next',
       args: 'start -p 40022',

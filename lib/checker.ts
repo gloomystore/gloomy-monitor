@@ -52,7 +52,7 @@ async function notify(
   const subjectParts: string[] = [];
   if (newlyDown.length) subjectParts.push(`장애 ${newlyDown.length}건`);
   if (newlyRecovered.length) subjectParts.push(`복구 ${newlyRecovered.length}건`);
-  const subject = `[site-monitor] ${subjectParts.join(', ')}`;
+  const subject = `[gloomymonitor] ${subjectParts.join(', ')}`;
 
   await sendMail(to, subject, lines.join('\n'));
 }
@@ -119,7 +119,7 @@ async function loop() {
   try {
     await runCheckCycle();
   } catch (e) {
-    console.error('[site-monitor] check cycle failed', e);
+    console.error('[gloomymonitor] check cycle failed', e);
   }
   const intervalMs = await getIntervalMs().catch(() => 60000);
   setTimeout(loop, intervalMs);

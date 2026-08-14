@@ -1,6 +1,19 @@
 {
-  "name": "site-monitor",
-  "version": "0.1.0",
+  "name": "gloomymonitor",
+  "version": "1.0.0",
+  "description": "A tiny self-hosted uptime monitor for pm2-managed web apps. Register a service and one or more URLs to check, and it only emails you the moment something stops returning 200 — silent otherwise.",
+  "keywords": [
+    "uptime-monitor",
+    "health-check",
+    "status-page",
+    "pm2",
+    "nextjs",
+    "mysql",
+    "email-alerts",
+    "self-hosted",
+    "monitoring",
+    "devops"
+  ],
   "private": true,
   "scripts": {
     "dev": "next dev",
