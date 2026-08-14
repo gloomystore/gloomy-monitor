@@ -115,14 +115,25 @@ async function getIntervalMs(): Promise<number> {
   return Math.max(5, seconds) * 1000;
 }
 
-async function loop() {
-  try {
-    await runCheckCycle();
-  } catch (e) {
-    console.error('[gloomymonitor] check cycle failed', e);
-  }
+let timer: ReturnType<typeof setTimeout> | null = null;
+let inFlight: Promise<void> | null = null;
+
+function runGuarded(): Promise<void> {
+  if (inFlight) return inFlight;
+  inFlight = runCheckCycle()
+    .catch((e) => {
+      console.error('[gloomymonitor] check cycle failed', e);
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
+}
+
+async function tick() {
+  await runGuarded();
   const intervalMs = await getIntervalMs().catch(() => 60000);
-  setTimeout(loop, intervalMs);
+  timer = setTimeout(tick, intervalMs);
 }
 
 declare global {
@@ -133,5 +144,19 @@ declare global {
 export function startChecker() {
   if (globalThis.__siteMonitorStarted) return;
   globalThis.__siteMonitorStarted = true;
-  loop();
+  tick();
+}
+
+/** Runs a check immediately and restarts the periodic timer from this moment. */
+export async function restartChecker(): Promise<void> {
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  await tick();
+}
+
+/** Manual, on-demand check that doesn't touch the periodic schedule. */
+export function checkNow(): Promise<void> {
+  return runGuarded();
 }

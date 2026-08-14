@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { runCheckCycle } from '@/lib/checker';
+import { checkNow } from '@/lib/checker';
 
 export async function POST() {
-  await runCheckCycle();
+  await checkNow();
   return NextResponse.json({ ok: true });
 }
