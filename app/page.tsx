@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 
 interface UrlItem {
@@ -28,6 +29,11 @@ export default function Home() {
   const [programs, setPrograms] = useState<Program[]>([]);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [intervalSeconds, setIntervalSeconds] = useState(60);
+  const [mailStatus, setMailStatus] = useState<{
+    ok: number | null;
+    error: string | null;
+    at: string | null;
+  }>({ ok: null, error: null, at: null });
 
   const [newName, setNewName] = useState('');
   const [newUrls, setNewUrls] = useState(['']);
@@ -39,6 +45,12 @@ export default function Home() {
   const [minutes, setMinutes] = useState(1);
   const [seconds, setSeconds] = useState(0);
   const [checking, setChecking] = useState(false);
+
+  const [downThresholdSeconds, setDownThresholdSeconds] = useState(0);
+  const [dtDays, setDtDays] = useState(0);
+  const [dtHours, setDtHours] = useState(0);
+  const [dtMinutes, setDtMinutes] = useState(0);
+  const [dtSeconds, setDtSeconds] = useState(0);
 
   const loadPrograms = useCallback(async () => {
     const res = await fetch('/api/programs', { cache: 'no-store' });
@@ -59,6 +71,14 @@ export default function Home() {
     setHours(Math.floor((total % 86400) / 3600));
     setMinutes(Math.floor((total % 3600) / 60));
     setSeconds(total % 60);
+    setMailStatus({ ok: data.last_mail_ok, error: data.last_mail_error, at: data.last_mail_at });
+
+    const dtTotal: number = data.down_threshold_seconds ?? 0;
+    setDownThresholdSeconds(dtTotal);
+    setDtDays(Math.floor(dtTotal / 86400));
+    setDtHours(Math.floor((dtTotal % 86400) / 3600));
+    setDtMinutes(Math.floor((dtTotal % 3600) / 60));
+    setDtSeconds(dtTotal % 60);
   }, []);
 
   useEffect(() => {
@@ -138,11 +158,21 @@ export default function Home() {
     setIntervalSeconds(total);
   }
 
+  async function saveDownThreshold() {
+    const total = dtDays * 86400 + dtHours * 3600 + dtMinutes * 60 + dtSeconds;
+    await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ down_threshold_seconds: total }),
+    });
+    setDownThresholdSeconds(total);
+  }
+
   async function runCheckNow() {
     setChecking(true);
     try {
       await fetch('/api/check', { method: 'POST' });
-      await loadPrograms();
+      await Promise.all([loadPrograms(), loadSettings()]);
     } finally {
       setChecking(false);
     }
@@ -162,7 +192,12 @@ export default function Home() {
             등록한 프로그램의 URL을 주기적으로 확인하고, 200이 아닌 상태가 나타나면 메일로 알려줍니다.
           </p>
         </div>
-        <button onClick={logout}>로그아웃</button>
+        <div className="row" style={{ marginBottom: 0 }}>
+          <Link href="/stats">
+            <button type="button">통계</button>
+          </Link>
+          <button onClick={logout}>로그아웃</button>
+        </div>
       </div>
 
       <section>
@@ -250,6 +285,21 @@ export default function Home() {
 
       <section>
         <h2>메일 수신자</h2>
+        {mailStatus.at && (
+          <p className="sub" style={{ marginBottom: 12 }}>
+            마지막 발송:{' '}
+            <span className={`badge ${mailStatus.ok ? 'ok' : 'fail'}`}>
+              {mailStatus.ok ? '성공' : '실패'}
+            </span>{' '}
+            ({new Date(mailStatus.at).toLocaleString('ko-KR')})
+            {!mailStatus.ok && mailStatus.error && (
+              <>
+                {' — '}
+                {mailStatus.error}
+              </>
+            )}
+          </p>
+        )}
         <form onSubmit={addRecipient} className="row">
           <input
             type="email"
@@ -293,6 +343,34 @@ export default function Home() {
           </div>
         </div>
         <button className="primary" onClick={saveInterval}>
+          저장
+        </button>
+      </section>
+
+      <section>
+        <h2>장애 판정 기준 시간 (현재 {downThresholdSeconds === 0 ? '즉시' : `${downThresholdSeconds}초`})</h2>
+        <p className="sub" style={{ marginBottom: 12 }}>
+          실패 상태가 이 시간 이상 계속돼야 장애로 판정하고 메일을 보냅니다. 0으로 두면 실패가 감지되는 즉시 발송합니다(기존 동작).
+        </p>
+        <div className="interval-grid">
+          <div className="field">
+            <label>일</label>
+            <input type="number" min={0} value={dtDays} onChange={(e) => setDtDays(Number(e.target.value))} />
+          </div>
+          <div className="field">
+            <label>시간</label>
+            <input type="number" min={0} value={dtHours} onChange={(e) => setDtHours(Number(e.target.value))} />
+          </div>
+          <div className="field">
+            <label>분</label>
+            <input type="number" min={0} value={dtMinutes} onChange={(e) => setDtMinutes(Number(e.target.value))} />
+          </div>
+          <div className="field">
+            <label>초</label>
+            <input type="number" min={0} value={dtSeconds} onChange={(e) => setDtSeconds(Number(e.target.value))} />
+          </div>
+        </div>
+        <button className="primary" onClick={saveDownThreshold}>
           저장
         </button>
       </section>

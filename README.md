@@ -48,6 +48,51 @@ pm2로 상시 구동하려면 `ecosystem.config.js`를 참고해 `pm2 start ecos
 | `SENDMAIL_PATH` | `sendmail` 바이너리 경로 (기본값 `sendmail`, PATH에 없으면 절대경로 지정) |
 | `AUTH_USER` / `AUTH_PASSWORD` | 대시보드 로그인 계정. 비워두면 인증이 비활성화됩니다 (권장하지 않음) |
 
+## 메일 발송 설정 (sendmail 호환 바이너리)
+
+이 앱은 SMTP를 직접 구현하지 않고, 시스템에 이미 설치된 `sendmail` 호환 바이너리를 그대로 실행해서 메일을 넘깁니다. 즉 **`sendmail` 명령이 실제로 메일을 어딘가로 발송할 수 있게 설정되어 있어야** 알림이 도착합니다. 아무것도 설치/설정하지 않은 서버라면 다음 중 하나를 준비하세요.
+
+### msmtp (Gmail 등 일반 SMTP 계정을 쓸 때 추천)
+
+```bash
+# Debian/Ubuntu
+sudo apt install msmtp msmtp-mta
+
+# RHEL/Fedora/CentOS
+sudo dnf install msmtp
+```
+
+`/etc/msmtprc` 예시 (Gmail 앱 비밀번호 기준, 다른 SMTP도 host/port만 바꾸면 동일):
+
+```
+defaults
+auth on
+tls on
+tls_starttls on
+
+account default
+host smtp.gmail.com
+port 587
+from your-alert-address@gmail.com
+user your-alert-address@gmail.com
+password your-app-password
+```
+
+`msmtp-mta` 패키지를 설치하면 `/usr/sbin/sendmail`이 자동으로 `msmtp`를 가리키게 됩니다. 그렇지 않다면 `.env`의 `SENDMAIL_PATH`를 `msmtp` 바이너리의 절대경로로 직접 지정하세요.
+
+### ssmtp / postfix
+
+- `ssmtp`도 `/etc/ssmtp/ssmtp.conf`에 동일한 SMTP 계정 정보를 넣는 방식으로 동작합니다.
+- 이미 postfix 같은 로컬 MTA가 돌고 있다면 별도 설정 없이 `sendmail`이 그대로 동작합니다.
+
+### 확인 방법
+
+```bash
+echo -e "Subject: test\n\nhello" | sendmail your-address@example.com
+```
+
+이 명령으로 메일이 도착하면 앱에서도 정상적으로 발송됩니다. 위 설정 없이 그냥 실행하면 앱 자체는 에러 없이 계속 동작하지만 메일만 조용히 발송되지 않으니, 반드시 실제 발송 여부까지 확인하세요. 대시보드의 "메일 수신자" 섹션에 마지막 발송 성공/실패 여부와 실패 사유가 표시되니, 설정 후 "지금 체크"로 상태 변화를 유발해 확인해볼 수 있습니다.
+
 ## 사용법
 
 1. 대시보드 상단에서 프로그램 이름과 URL(들)을 입력해 등록합니다.

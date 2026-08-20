@@ -6,6 +6,7 @@ interface ProgramRow extends RowDataPacket {
   id: number;
   name: string;
   is_down: number;
+  first_fail_at: string | null;
 }
 
 interface UrlRow extends RowDataPacket {
@@ -18,7 +19,14 @@ async function checkUrl(url: string): Promise<{ status: number | null; error: st
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+    const res = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 gloomymonitor/1.0',
+      },
+    });
     return { status: res.status, error: null };
   } catch (e) {
     return { status: null, error: e instanceof Error ? e.message : 'fetch failed' };
@@ -27,9 +35,27 @@ async function checkUrl(url: string): Promise<{ status: number | null; error: st
   }
 }
 
+async function logIncidents(
+  newlyDown: { id: number; name: string; fails: string[] }[],
+  newlyRecovered: { id: number; name: string }[]
+) {
+  for (const d of newlyDown) {
+    await pool.query(
+      "INSERT INTO incidents (program_id, program_name, type, detail) VALUES (?, ?, 'down', ?)",
+      [d.id, d.name, d.fails.join('\n')]
+    );
+  }
+  for (const r of newlyRecovered) {
+    await pool.query(
+      "INSERT INTO incidents (program_id, program_name, type, detail) VALUES (?, ?, 'recovered', NULL)",
+      [r.id, r.name]
+    );
+  }
+}
+
 async function notify(
-  newlyDown: { name: string; fails: string[] }[],
-  newlyRecovered: string[]
+  newlyDown: { id: number; name: string; fails: string[] }[],
+  newlyRecovered: { id: number; name: string }[]
 ) {
   const [recipients] = await pool.query<RowDataPacket[]>('SELECT email FROM recipients');
   const to = recipients.map((r) => r.email as string);
@@ -46,7 +72,7 @@ async function notify(
   }
   if (newlyRecovered.length > 0) {
     lines.push('[복구됨]');
-    for (const name of newlyRecovered) lines.push(`- ${name}`);
+    for (const r of newlyRecovered) lines.push(`- ${r.name}`);
   }
 
   const subjectParts: string[] = [];
@@ -54,11 +80,30 @@ async function notify(
   if (newlyRecovered.length) subjectParts.push(`복구 ${newlyRecovered.length}건`);
   const subject = `[gloomymonitor] ${subjectParts.join(', ')}`;
 
-  await sendMail(to, subject, lines.join('\n'));
+  try {
+    await sendMail(to, subject, lines.join('\n'));
+    await pool.query(
+      'UPDATE settings SET last_mail_ok=1, last_mail_error=NULL, last_mail_at=NOW() WHERE id=1'
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'sendMail failed';
+    console.error('[gloomymonitor] sendMail failed', e);
+    await pool.query(
+      'UPDATE settings SET last_mail_ok=0, last_mail_error=?, last_mail_at=NOW() WHERE id=1',
+      [message.slice(0, 500)]
+    );
+  }
 }
 
 export async function runCheckCycle(): Promise<void> {
-  const [programs] = await pool.query<ProgramRow[]>('SELECT id, name, is_down FROM programs');
+  const [settingsRows] = await pool.query<RowDataPacket[]>(
+    'SELECT down_threshold_seconds FROM settings WHERE id=1'
+  );
+  const thresholdSeconds = settingsRows[0]?.down_threshold_seconds ?? 0;
+
+  const [programs] = await pool.query<ProgramRow[]>(
+    'SELECT id, name, is_down, first_fail_at FROM programs'
+  );
   const [urls] = await pool.query<UrlRow[]>('SELECT id, program_id, url FROM program_urls');
 
   const urlsByProgram = new Map<number, UrlRow[]>();
@@ -68,8 +113,8 @@ export async function runCheckCycle(): Promise<void> {
     urlsByProgram.set(u.program_id, list);
   }
 
-  const newlyDown: { name: string; fails: string[] }[] = [];
-  const newlyRecovered: string[] = [];
+  const newlyDown: { id: number; name: string; fails: string[] }[] = [];
+  const newlyRecovered: { id: number; name: string }[] = [];
 
   for (const program of programs) {
     const programUrls = urlsByProgram.get(program.id) ?? [];
@@ -82,7 +127,9 @@ export async function runCheckCycle(): Promise<void> {
       const { status, error } = await checkUrl(u.url);
       if (status !== 200) {
         anyFail = true;
-        failDetails.push(`${u.url} -> ${status ?? 'ERROR'}${error ? ` (${error})` : ''}`);
+        const detail = `${u.url} -> ${status ?? 'ERROR'}${error ? ` (${error})` : ''}`;
+        failDetails.push(detail);
+        console.error(`[gloomymonitor] ${new Date().toISOString()} check failed: ${detail}`);
       }
       await pool.query(
         'UPDATE program_urls SET last_status=?, last_checked_at=NOW(), last_error=? WHERE id=?',
@@ -91,18 +138,34 @@ export async function runCheckCycle(): Promise<void> {
     }
 
     const wasDown = !!program.is_down;
-    if (anyFail && !wasDown) {
-      newlyDown.push({ name: program.name, fails: failDetails });
-    } else if (!anyFail && wasDown) {
-      newlyRecovered.push(program.name);
-    }
 
-    if (anyFail !== wasDown) {
-      await pool.query('UPDATE programs SET is_down=? WHERE id=?', [anyFail ? 1 : 0, program.id]);
+    if (anyFail) {
+      if (!program.first_fail_at) {
+        await pool.query('UPDATE programs SET first_fail_at=NOW() WHERE id=?', [program.id]);
+      }
+      const [durRows] = await pool.query<RowDataPacket[]>(
+        'SELECT TIMESTAMPDIFF(SECOND, first_fail_at, NOW()) AS down_seconds FROM programs WHERE id=?',
+        [program.id]
+      );
+      const downSeconds = durRows[0]?.down_seconds ?? 0;
+
+      if (!wasDown && downSeconds >= thresholdSeconds) {
+        newlyDown.push({ id: program.id, name: program.name, fails: failDetails });
+        await pool.query('UPDATE programs SET is_down=1 WHERE id=?', [program.id]);
+      }
+    } else {
+      if (program.first_fail_at) {
+        await pool.query('UPDATE programs SET first_fail_at=NULL WHERE id=?', [program.id]);
+      }
+      if (wasDown) {
+        newlyRecovered.push({ id: program.id, name: program.name });
+        await pool.query('UPDATE programs SET is_down=0 WHERE id=?', [program.id]);
+      }
     }
   }
 
   if (newlyDown.length > 0 || newlyRecovered.length > 0) {
+    await logIncidents(newlyDown, newlyRecovered);
     await notify(newlyDown, newlyRecovered);
   }
 }

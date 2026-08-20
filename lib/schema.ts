@@ -34,4 +34,33 @@ export async function ensureSchema(): Promise<void> {
     ) ENGINE=InnoDB
   `);
   await pool.query('INSERT IGNORE INTO settings (id, interval_seconds) VALUES (1, 60)');
+
+  await pool
+    .query(
+      `ALTER TABLE settings
+        ADD COLUMN last_mail_ok TINYINT(1) NULL,
+        ADD COLUMN last_mail_error VARCHAR(500) NULL,
+        ADD COLUMN last_mail_at DATETIME NULL`
+    )
+    .catch(() => {});
+
+  await pool
+    .query(`ALTER TABLE settings ADD COLUMN down_threshold_seconds INT NOT NULL DEFAULT 0`)
+    .catch(() => {});
+
+  await pool
+    .query(`ALTER TABLE programs ADD COLUMN first_fail_at DATETIME NULL`)
+    .catch(() => {});
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS incidents (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      program_id INT NULL,
+      program_name VARCHAR(255) NOT NULL,
+      type ENUM('down', 'recovered') NOT NULL,
+      detail TEXT NULL,
+      occurred_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX (occurred_at)
+    ) ENGINE=InnoDB
+  `);
 }
