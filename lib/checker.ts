@@ -15,7 +15,9 @@ interface UrlRow extends RowDataPacket {
   url: string;
 }
 
-async function checkUrl(url: string): Promise<{ status: number | null; error: string | null }> {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function checkUrlOnce(url: string): Promise<{ status: number | null; error: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
@@ -33,6 +35,18 @@ async function checkUrl(url: string): Promise<{ status: number | null; error: st
   } finally {
     clearTimeout(timer);
   }
+}
+
+const CHECK_RETRIES = 2;
+const CHECK_RETRY_DELAY_MS = 3000;
+
+async function checkUrl(url: string): Promise<{ status: number | null; error: string | null }> {
+  let result = await checkUrlOnce(url);
+  for (let attempt = 1; result.status !== 200 && attempt <= CHECK_RETRIES; attempt++) {
+    await sleep(CHECK_RETRY_DELAY_MS);
+    result = await checkUrlOnce(url);
+  }
+  return result;
 }
 
 async function logIncidents(
