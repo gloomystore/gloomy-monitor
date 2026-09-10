@@ -32,8 +32,8 @@ export default function Home() {
   const [mailStatus, setMailStatus] = useState<{
     ok: number | null;
     error: string | null;
-    at: string | null;
-  }>({ ok: null, error: null, at: null });
+    sentAt: string | null;
+  }>({ ok: null, error: null, sentAt: null });
 
   const [newName, setNewName] = useState('');
   const [newUrls, setNewUrls] = useState(['']);
@@ -47,10 +47,10 @@ export default function Home() {
   const [checking, setChecking] = useState(false);
 
   const [downThresholdSeconds, setDownThresholdSeconds] = useState(0);
-  const [dtDays, setDtDays] = useState(0);
-  const [dtHours, setDtHours] = useState(0);
-  const [dtMinutes, setDtMinutes] = useState(0);
-  const [dtSeconds, setDtSeconds] = useState(0);
+  const [thresholdDays, setThresholdDays] = useState(0);
+  const [thresholdHours, setThresholdHours] = useState(0);
+  const [thresholdMinutes, setThresholdMinutes] = useState(0);
+  const [thresholdSeconds, setThresholdSeconds] = useState(0);
 
   const loadPrograms = useCallback(async () => {
     const res = await fetch('/api/programs', { cache: 'no-store' });
@@ -71,14 +71,14 @@ export default function Home() {
     setHours(Math.floor((total % 86400) / 3600));
     setMinutes(Math.floor((total % 3600) / 60));
     setSeconds(total % 60);
-    setMailStatus({ ok: data.last_mail_ok, error: data.last_mail_error, at: data.last_mail_at });
+    setMailStatus({ ok: data.last_mail_ok, error: data.last_mail_error, sentAt: data.last_mail_at });
 
-    const dtTotal: number = data.down_threshold_seconds ?? 0;
-    setDownThresholdSeconds(dtTotal);
-    setDtDays(Math.floor(dtTotal / 86400));
-    setDtHours(Math.floor((dtTotal % 86400) / 3600));
-    setDtMinutes(Math.floor((dtTotal % 3600) / 60));
-    setDtSeconds(dtTotal % 60);
+    const thresholdTotal: number = data.down_threshold_seconds ?? 0;
+    setDownThresholdSeconds(thresholdTotal);
+    setThresholdDays(Math.floor(thresholdTotal / 86400));
+    setThresholdHours(Math.floor((thresholdTotal % 86400) / 3600));
+    setThresholdMinutes(Math.floor((thresholdTotal % 3600) / 60));
+    setThresholdSeconds(thresholdTotal % 60);
   }, []);
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function Home() {
   }
 
   async function saveDownThreshold() {
-    const total = dtDays * 86400 + dtHours * 3600 + dtMinutes * 60 + dtSeconds;
+    const total = thresholdDays * 86400 + thresholdHours * 3600 + thresholdMinutes * 60 + thresholdSeconds;
     await fetch('/api/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -209,21 +209,21 @@ export default function Home() {
           </div>
           <div className="field">
             <label>URL (하나라도 200이 아니면 비정상으로 처리)</label>
-            {newUrls.map((url, idx) => (
-              <div className="url-row" key={idx}>
+            {newUrls.map((url, index) => (
+              <div className="url-row" key={index}>
                 <input
                   type="text"
                   value={url}
                   placeholder="https://..."
                   onChange={(e) => {
-                    const next = [...newUrls];
-                    next[idx] = e.target.value;
-                    setNewUrls(next);
+                    const updatedUrls = [...newUrls];
+                    updatedUrls[index] = e.target.value;
+                    setNewUrls(updatedUrls);
                   }}
                 />
                 <button
                   type="button"
-                  onClick={() => setNewUrls(newUrls.filter((_, i) => i !== idx))}
+                  onClick={() => setNewUrls(newUrls.filter((_, i) => i !== index))}
                   disabled={newUrls.length === 1}
                 >
                   삭제
@@ -285,13 +285,13 @@ export default function Home() {
 
       <section>
         <h2>메일 수신자</h2>
-        {mailStatus.at && (
+        {mailStatus.sentAt && (
           <p className="sub" style={{ marginBottom: 12 }}>
             마지막 발송:{' '}
             <span className={`badge ${mailStatus.ok ? 'ok' : 'fail'}`}>
               {mailStatus.ok ? '성공' : '실패'}
             </span>{' '}
-            ({new Date(mailStatus.at).toLocaleString('ko-KR')})
+            ({new Date(mailStatus.sentAt).toLocaleString('ko-KR')})
             {!mailStatus.ok && mailStatus.error && (
               <>
                 {' — '}
@@ -355,19 +355,19 @@ export default function Home() {
         <div className="interval-grid">
           <div className="field">
             <label>일</label>
-            <input type="number" min={0} value={dtDays} onChange={(e) => setDtDays(Number(e.target.value))} />
+            <input type="number" min={0} value={thresholdDays} onChange={(e) => setThresholdDays(Number(e.target.value))} />
           </div>
           <div className="field">
             <label>시간</label>
-            <input type="number" min={0} value={dtHours} onChange={(e) => setDtHours(Number(e.target.value))} />
+            <input type="number" min={0} value={thresholdHours} onChange={(e) => setThresholdHours(Number(e.target.value))} />
           </div>
           <div className="field">
             <label>분</label>
-            <input type="number" min={0} value={dtMinutes} onChange={(e) => setDtMinutes(Number(e.target.value))} />
+            <input type="number" min={0} value={thresholdMinutes} onChange={(e) => setThresholdMinutes(Number(e.target.value))} />
           </div>
           <div className="field">
             <label>초</label>
-            <input type="number" min={0} value={dtSeconds} onChange={(e) => setDtSeconds(Number(e.target.value))} />
+            <input type="number" min={0} value={thresholdSeconds} onChange={(e) => setThresholdSeconds(Number(e.target.value))} />
           </div>
         </div>
         <button className="primary" onClick={saveDownThreshold}>

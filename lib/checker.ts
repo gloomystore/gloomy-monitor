@@ -108,9 +108,9 @@ export async function runCheckCycle(): Promise<void> {
 
   const urlsByProgram = new Map<number, UrlRow[]>();
   for (const urlRow of urls) {
-    const list = urlsByProgram.get(urlRow.program_id) ?? [];
-    list.push(urlRow);
-    urlsByProgram.set(urlRow.program_id, list);
+    const urlsForProgram = urlsByProgram.get(urlRow.program_id) ?? [];
+    urlsForProgram.push(urlRow);
+    urlsByProgram.set(urlRow.program_id, urlsForProgram);
   }
 
   const newlyDown: { id: number; name: string; fails: string[] }[] = [];
@@ -143,11 +143,11 @@ export async function runCheckCycle(): Promise<void> {
       if (!program.first_fail_at) {
         await pool.query('UPDATE programs SET first_fail_at=NOW() WHERE id=?', [program.id]);
       }
-      const [durRows] = await pool.query<RowDataPacket[]>(
+      const [durationRows] = await pool.query<RowDataPacket[]>(
         'SELECT TIMESTAMPDIFF(SECOND, first_fail_at, NOW()) AS down_seconds FROM programs WHERE id=?',
         [program.id]
       );
-      const downSeconds = durRows[0]?.down_seconds ?? 0;
+      const downSeconds = durationRows[0]?.down_seconds ?? 0;
 
       if (!wasDown && downSeconds >= thresholdSeconds) {
         newlyDown.push({ id: program.id, name: program.name, fails: failDetails });

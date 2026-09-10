@@ -19,17 +19,17 @@ export function sendMail(to: string[], subject: string, bodyText: string): Promi
       bodyText,
     ].join('\r\n');
 
-    const proc = spawn(SENDMAIL_PATH, ['-t', '-oi']);
+    const sendmailProcess = spawn(SENDMAIL_PATH, ['-t', '-oi']);
     let stderr = '';
-    proc.stderr.on('data', (chunk) => {
+    sendmailProcess.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
     });
-    proc.on('error', reject);
-    proc.on('close', (code) => {
+    sendmailProcess.on('error', reject);
+    sendmailProcess.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`sendmail exited with code ${code}: ${stderr}`));
     });
-    proc.stdin.write(headers);
-    proc.stdin.end();
+    sendmailProcess.stdin.write(headers);
+    sendmailProcess.stdin.end();
   });
 }
