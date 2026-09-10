@@ -18,7 +18,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   const body = await req.json();
   const name = (body.name ?? '').trim();
   const urls: string[] = Array.isArray(body.urls)
-    ? body.urls.map((u: string) => u.trim()).filter(Boolean)
+    ? body.urls.map((url: string) => url.trim()).filter(Boolean)
     : [];
 
   if (!name || urls.length === 0) {

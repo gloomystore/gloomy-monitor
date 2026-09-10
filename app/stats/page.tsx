@@ -30,8 +30,8 @@ export default function StatsPage() {
     window.location.href = '/login';
   }
 
-  const downCount = incidents.filter((i) => i.type === 'down').length;
-  const recoveredCount = incidents.filter((i) => i.type === 'recovered').length;
+  const downCount = incidents.filter((incident) => incident.type === 'down').length;
+  const recoveredCount = incidents.filter((incident) => incident.type === 'recovered').length;
 
   return (
     <main>
@@ -59,22 +59,22 @@ export default function StatsPage() {
       <section>
         {loading && <p className="empty">불러오는 중...</p>}
         {!loading && incidents.length === 0 && <p className="empty">아직 기록된 장애/복구 이력이 없습니다.</p>}
-        {incidents.map((i) => (
-          <div className="program" key={i.id}>
+        {incidents.map((incident) => (
+          <div className="program" key={incident.id}>
             <div className="program-head">
               <div className="row" style={{ marginBottom: 0 }}>
-                <span className="program-name">{i.program_name}</span>
-                <span className={`badge ${i.type === 'down' ? 'fail' : 'ok'}`}>
-                  {i.type === 'down' ? '장애' : '복구'}
+                <span className="program-name">{incident.program_name}</span>
+                <span className={`badge ${incident.type === 'down' ? 'fail' : 'ok'}`}>
+                  {incident.type === 'down' ? '장애' : '복구'}
                 </span>
               </div>
               <span className="sub" style={{ marginBottom: 0 }}>
-                {new Date(i.occurred_at).toLocaleString('ko-KR')}
+                {new Date(incident.occurred_at).toLocaleString('ko-KR')}
               </span>
             </div>
-            {i.detail && (
+            {incident.detail && (
               <div className="url-item" style={{ whiteSpace: 'pre-wrap' }}>
-                <span>{i.detail}</span>
+                <span>{incident.detail}</span>
               </div>
             )}
           </div>

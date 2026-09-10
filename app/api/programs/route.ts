@@ -10,9 +10,9 @@ export async function GET() {
     'SELECT id, program_id, url, last_status, last_checked_at, last_error FROM program_urls ORDER BY id ASC'
   );
 
-  const result = programs.map((p) => ({
-    ...p,
-    urls: urls.filter((u) => u.program_id === p.id),
+  const result = programs.map((program) => ({
+    ...program,
+    urls: urls.filter((urlRow) => urlRow.program_id === program.id),
   }));
 
   return NextResponse.json(result);
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   const body = await req.json();
   const name = (body.name ?? '').trim();
   const urls: string[] = Array.isArray(body.urls)
-    ? body.urls.map((u: string) => u.trim()).filter(Boolean)
+    ? body.urls.map((url: string) => url.trim()).filter(Boolean)
     : [];
 
   if (!name || urls.length === 0) {

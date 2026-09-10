@@ -39,16 +39,16 @@ async function logIncidents(
   newlyDown: { id: number; name: string; fails: string[] }[],
   newlyRecovered: { id: number; name: string }[]
 ) {
-  for (const d of newlyDown) {
+  for (const down of newlyDown) {
     await pool.query(
       "INSERT INTO incidents (program_id, program_name, type, detail) VALUES (?, ?, 'down', ?)",
-      [d.id, d.name, d.fails.join('\n')]
+      [down.id, down.name, down.fails.join('\n')]
     );
   }
-  for (const r of newlyRecovered) {
+  for (const recovered of newlyRecovered) {
     await pool.query(
       "INSERT INTO incidents (program_id, program_name, type, detail) VALUES (?, ?, 'recovered', NULL)",
-      [r.id, r.name]
+      [recovered.id, recovered.name]
     );
   }
 }
@@ -58,21 +58,21 @@ async function notify(
   newlyRecovered: { id: number; name: string }[]
 ) {
   const [recipients] = await pool.query<RowDataPacket[]>('SELECT email FROM recipients');
-  const to = recipients.map((r) => r.email as string);
+  const to = recipients.map((recipient) => recipient.email as string);
   if (to.length === 0) return;
 
   const lines: string[] = [];
   if (newlyDown.length > 0) {
     lines.push('[장애 발생]');
-    for (const d of newlyDown) {
-      lines.push(`- ${d.name}`);
-      for (const f of d.fails) lines.push(`   ${f}`);
+    for (const down of newlyDown) {
+      lines.push(`- ${down.name}`);
+      for (const fail of down.fails) lines.push(`   ${fail}`);
     }
     lines.push('');
   }
   if (newlyRecovered.length > 0) {
     lines.push('[복구됨]');
-    for (const r of newlyRecovered) lines.push(`- ${r.name}`);
+    for (const recovered of newlyRecovered) lines.push(`- ${recovered.name}`);
   }
 
   const subjectParts: string[] = [];
@@ -107,10 +107,10 @@ export async function runCheckCycle(): Promise<void> {
   const [urls] = await pool.query<UrlRow[]>('SELECT id, program_id, url FROM program_urls');
 
   const urlsByProgram = new Map<number, UrlRow[]>();
-  for (const u of urls) {
-    const list = urlsByProgram.get(u.program_id) ?? [];
-    list.push(u);
-    urlsByProgram.set(u.program_id, list);
+  for (const urlRow of urls) {
+    const list = urlsByProgram.get(urlRow.program_id) ?? [];
+    list.push(urlRow);
+    urlsByProgram.set(urlRow.program_id, list);
   }
 
   const newlyDown: { id: number; name: string; fails: string[] }[] = [];
@@ -123,17 +123,17 @@ export async function runCheckCycle(): Promise<void> {
     let anyFail = false;
     const failDetails: string[] = [];
 
-    for (const u of programUrls) {
-      const { status, error } = await checkUrl(u.url);
+    for (const urlRow of programUrls) {
+      const { status, error } = await checkUrl(urlRow.url);
       if (status !== 200) {
         anyFail = true;
-        const detail = `${u.url} -> ${status ?? 'ERROR'}${error ? ` (${error})` : ''}`;
+        const detail = `${urlRow.url} -> ${status ?? 'ERROR'}${error ? ` (${error})` : ''}`;
         failDetails.push(detail);
         console.error(`[gloomymonitor] ${new Date().toISOString()} check failed: ${detail}`);
       }
       await pool.query(
         'UPDATE program_urls SET last_status=?, last_checked_at=NOW(), last_error=? WHERE id=?',
-        [status, error, u.id]
+        [status, error, urlRow.id]
       );
     }
 

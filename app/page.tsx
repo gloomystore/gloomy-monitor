@@ -95,16 +95,16 @@ export default function Home() {
     setEditingId(null);
   }
 
-  function startEdit(p: Program) {
-    setEditingId(p.id);
-    setNewName(p.name);
-    setNewUrls(p.urls.map((u) => u.url).length ? p.urls.map((u) => u.url) : ['']);
+  function startEdit(program: Program) {
+    setEditingId(program.id);
+    setNewName(program.name);
+    setNewUrls(program.urls.map((urlItem) => urlItem.url).length ? program.urls.map((urlItem) => urlItem.url) : ['']);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function submitProgram(e: React.FormEvent) {
     e.preventDefault();
-    const urls = newUrls.map((u) => u.trim()).filter(Boolean);
+    const urls = newUrls.map((url) => url.trim()).filter(Boolean);
     if (!newName.trim() || urls.length === 0) return;
 
     const payload = { name: newName.trim(), urls };
@@ -255,27 +255,27 @@ export default function Home() {
           </button>
         </div>
         {programs.length === 0 && <p className="empty">등록된 프로그램이 없습니다.</p>}
-        {programs.map((p) => (
-          <div className="program" key={p.id}>
+        {programs.map((program) => (
+          <div className="program" key={program.id}>
             <div className="program-head">
               <div className="row" style={{ marginBottom: 0 }}>
-                <span className="program-name">{p.name}</span>
-                <span className={`badge ${p.is_down ? 'fail' : 'ok'}`}>
-                  {p.is_down ? '비정상' : '정상'}
+                <span className="program-name">{program.name}</span>
+                <span className={`badge ${program.is_down ? 'fail' : 'ok'}`}>
+                  {program.is_down ? '비정상' : '정상'}
                 </span>
               </div>
               <div className="actions">
-                <button onClick={() => startEdit(p)}>수정</button>
-                <button className="danger" onClick={() => deleteProgram(p.id)}>
+                <button onClick={() => startEdit(program)}>수정</button>
+                <button className="danger" onClick={() => deleteProgram(program.id)}>
                   삭제
                 </button>
               </div>
             </div>
-            {p.urls.map((u) => (
-              <div className="url-item" key={u.id}>
-                <span>{u.url}</span>
-                <span className={`status ${u.last_status === 200 ? 'ok' : 'fail'}`}>
-                  {u.last_status ?? (u.last_checked_at ? 'ERROR' : '미확인')}
+            {program.urls.map((urlItem) => (
+              <div className="url-item" key={urlItem.id}>
+                <span>{urlItem.url}</span>
+                <span className={`status ${urlItem.last_status === 200 ? 'ok' : 'fail'}`}>
+                  {urlItem.last_status ?? (urlItem.last_checked_at ? 'ERROR' : '미확인')}
                 </span>
               </div>
             ))}
@@ -313,10 +313,10 @@ export default function Home() {
         </form>
         <div style={{ marginTop: 10 }}>
           {recipients.length === 0 && <p className="empty">등록된 수신자가 없습니다.</p>}
-          {recipients.map((r) => (
-            <span className="chip" key={r.id}>
-              {r.email}
-              <button onClick={() => removeRecipient(r.id)}>×</button>
+          {recipients.map((recipient) => (
+            <span className="chip" key={recipient.id}>
+              {recipient.email}
+              <button onClick={() => removeRecipient(recipient.id)}>×</button>
             </span>
           ))}
         </div>
